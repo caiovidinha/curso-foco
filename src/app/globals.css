@@ -1,26 +1,317 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+/* ==========================================================================
+   Curso Foco — sistema visual estritamente preto e branco.
+   Uma escala única de tinta sobre papel; nenhuma cor cromática.
+   ========================================================================== */
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+:root {
+  /* faz o navegador desenhar seletor de data, dropdown e barra de rolagem
+     nativos no tom certo — sem isso eles saem claros no tema escuro */
+  color-scheme: light;
+
+  --paper: #ffffff;
+  --soft: #f6f6f6;
+  --line: #e4e4e4;
+  --line-strong: #c9c9c9;
+  --muted: #6b6b6b;
+  --sub: #8f8f8f;
+  --ink: #0b0b0b;
+  --ink-soft: #1f1f1f;
+  --on-ink: #ffffff;
+  --shadow: 0 1px 2px rgb(0 0 0 / 0.04), 0 8px 24px -12px rgb(0 0 0 / 0.12);
 }
 
 @media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --paper: #0b0b0b;
+    --soft: #151515;
+    --line: #262626;
+    --line-strong: #3a3a3a;
+    --muted: #9a9a9a;
+    --sub: #6f6f6f;
+    --ink: #fafafa;
+    --ink-soft: #e8e8e8;
+    --on-ink: #0b0b0b;
+    --shadow: 0 1px 2px rgb(0 0 0 / 0.5), 0 8px 24px -12px rgb(0 0 0 / 0.7);
   }
 }
 
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --paper: #0b0b0b;
+  --soft: #151515;
+  --line: #262626;
+  --line-strong: #3a3a3a;
+  --muted: #9a9a9a;
+  --sub: #6f6f6f;
+  --ink: #fafafa;
+  --ink-soft: #e8e8e8;
+  --on-ink: #0b0b0b;
+  --shadow: 0 1px 2px rgb(0 0 0 / 0.5), 0 8px 24px -12px rgb(0 0 0 / 0.7);
+}
+
+@theme inline {
+  --color-paper: var(--paper);
+  --color-soft: var(--soft);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-muted: var(--muted);
+  --color-sub: var(--sub);
+  --color-ink: var(--ink);
+  --color-ink-soft: var(--ink-soft);
+  --color-on-ink: var(--on-ink);
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+}
+
+* {
+  border-color: var(--line);
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  overscroll-behavior-y: none;
+}
+
+::selection {
+  background: var(--ink);
+  color: var(--on-ink);
+}
+
+/* O Tailwind v4 zera o cursor dos controles; devolvemos a mão em tudo que clica. */
+button,
+summary,
+[role="button"],
+[type="button"],
+[type="submit"],
+[type="reset"],
+[type="checkbox"],
+[type="radio"],
+[type="file"],
+select,
+label:has(> [type="checkbox"]),
+label:has(> [type="radio"]) {
+  cursor: pointer;
+}
+
+button:disabled,
+select:disabled,
+[type="button"]:disabled,
+[type="submit"]:disabled,
+[type="checkbox"]:disabled,
+[type="radio"]:disabled {
+  cursor: not-allowed;
+}
+
+:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+@layer components {
+  /* --- superfícies ------------------------------------------------------ */
+  .card {
+    @apply rounded-2xl border border-line bg-paper;
+    box-shadow: var(--shadow);
+  }
+
+  .card-flat {
+    @apply rounded-2xl border border-line bg-soft;
+  }
+
+  .section-title {
+    @apply text-[0.7rem] font-semibold uppercase tracking-[0.14em] text-sub;
+  }
+
+  /* --- botões ----------------------------------------------------------- */
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl border border-line
+           px-4 py-2.5 text-sm font-medium whitespace-nowrap
+           transition-colors duration-150 select-none
+           disabled:pointer-events-none disabled:opacity-40;
+    min-height: 2.75rem;
+  }
+
+  .btn-primary {
+    @apply bg-ink text-on-ink border-ink;
+  }
+  .btn-primary:hover {
+    background: var(--ink-soft);
+  }
+
+  .btn-outline {
+    @apply bg-paper text-ink;
+  }
+  .btn-outline:hover {
+    background: var(--soft);
+  }
+
+  .btn-ghost {
+    @apply border-transparent bg-transparent text-muted;
+  }
+  .btn-ghost:hover {
+    background: var(--soft);
+    color: var(--ink);
+  }
+
+  .btn-sm {
+    @apply px-3 py-1.5 text-xs rounded-lg;
+    min-height: 2rem;
+  }
+
+  /* --- formulários ------------------------------------------------------ */
+  .label {
+    @apply mb-1.5 block text-xs font-medium tracking-wide text-muted;
+  }
+
+  .input,
+  .select,
+  .textarea {
+    @apply w-full rounded-xl border border-line bg-paper px-3.5 py-2.5 text-sm text-ink
+           transition-colors placeholder:text-sub;
+    min-height: 2.75rem;
+  }
+
+  .input:focus,
+  .select:focus,
+  .textarea:focus {
+    @apply outline-none;
+    border-color: var(--ink);
+  }
+
+  .select {
+    appearance: none;
+    background-image: linear-gradient(45deg, transparent 50%, var(--muted) 50%),
+      linear-gradient(135deg, var(--muted) 50%, transparent 50%);
+    background-position: calc(100% - 18px) 50%, calc(100% - 13px) 50%;
+    background-size: 5px 5px, 5px 5px;
+    background-repeat: no-repeat;
+    padding-right: 2.25rem;
+  }
+
+  .textarea {
+    min-height: 5rem;
+  }
+
+  /* --- dados ------------------------------------------------------------ */
+  .badge {
+    @apply inline-flex items-center gap-1 rounded-full border border-line px-2.5 py-0.5
+           text-[0.7rem] font-medium text-muted whitespace-nowrap;
+  }
+
+  .badge-solid {
+    @apply border-ink bg-ink text-on-ink;
+  }
+
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+
+  .table-wrap {
+    @apply -mx-1 overflow-x-auto;
+  }
+
+  .table {
+    @apply w-full border-collapse text-sm;
+  }
+
+  .table th {
+    @apply px-3 py-2.5 text-left text-[0.7rem] font-semibold uppercase tracking-[0.1em]
+           text-sub whitespace-nowrap;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .table td {
+    @apply px-3 py-3 align-middle;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .table tbody tr:last-child td {
+    border-bottom: 0;
+  }
+
+  .table tbody tr:hover td {
+    background: var(--soft);
+  }
+
+  /* --- bolhas de alternativa (correção manual) -------------------------- */
+  .bubble {
+    @apply flex items-center justify-center rounded-full border text-xs font-semibold
+           transition-all duration-100 select-none;
+    width: 2rem;
+    height: 2rem;
+    border-color: var(--line-strong);
+    color: var(--muted);
+    background: var(--paper);
+  }
+
+  .bubble:hover {
+    border-color: var(--ink);
+    color: var(--ink);
+  }
+
+  .bubble-on {
+    background: var(--ink);
+    border-color: var(--ink);
+    color: var(--on-ink);
+  }
+
+  .skeleton {
+    @apply animate-pulse rounded-lg bg-soft;
+  }
+}
+
+/* --- barra de rolagem discreta ------------------------------------------ */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--line-strong);
+  border-radius: 99px;
+  border: 3px solid var(--paper);
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* --- impressão do cartão-resposta --------------------------------------- */
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 0;
+  }
+
+  html,
+  body {
+    background: #fff !important;
+    color: #000 !important;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+
+  .sheet {
+    box-shadow: none !important;
+    margin: 0 !important;
+    border: 0 !important;
+    break-after: page;
+    page-break-after: always;
+  }
+
+  .sheet:last-child {
+    break-after: auto;
+    page-break-after: auto;
+  }
 }
