@@ -14,6 +14,7 @@ import {
 import { BotaoAcao, BotaoSubmit, FormAcao } from "@/components/forms";
 import { IconCopy, IconPlus, IconPrint, IconTrash } from "@/components/icons";
 import { EmptyState, Field, Stat } from "@/components/ui";
+import { formatarNumerosQuestoes } from "@/lib/numeracao";
 import { getCatalogo, getSimulado, getTurmas } from "@/lib/queries";
 import { ROTULO_TIPO } from "@/lib/types";
 import { CamposBloco } from "./campos-bloco";
@@ -73,14 +74,15 @@ export default async function EstruturaPage({ params }: PageProps<"/simulados/[i
         {simulado.blocos.length === 0 ? (
           <EmptyState
             titulo="Nenhum bloco ainda"
-            descricao="Adicione uma matéria e a quantidade de questões dela. A numeração é gerada automaticamente na ordem dos blocos."
+            descricao="Adicione uma matéria e informe os números exatos das questões, mesmo que não sejam sequenciais."
           />
         ) : (
           <ul className="space-y-3">
             {simulado.blocos.map((b, i) => {
               const primeira = b.questoes[0]?.numero;
-              const ultima = b.questoes[b.questoes.length - 1]?.numero;
               const q0 = b.questoes[0];
+              const numeros = b.questoes.map((q) => q.numero);
+              const numeracao = formatarNumerosQuestoes(numeros);
 
               return (
                 <li key={b.id} className="card p-4">
@@ -96,8 +98,8 @@ export default async function EstruturaPage({ params }: PageProps<"/simulados/[i
                             : q0?.tipo === "redacao"
                               ? `Item ${primeira} · vale ${Number(q0.peso).toLocaleString("pt-BR")} pts`
                               : q0?.tipo === "discursiva"
-                                ? `Questões ${primeira}–${ultima} · ${Number(q0.peso).toLocaleString("pt-BR")} pts cada`
-                                : `Questões ${primeira}–${ultima} · ${q0?.num_opcoes} alternativas`}
+                                ? `${b.questoes.length} questões: ${numeracao} · ${Number(q0.peso).toLocaleString("pt-BR")} pts cada`
+                                : `${b.questoes.length} questões: ${numeracao} · ${q0?.num_opcoes} alternativas`}
                         </span>
                       </div>
                     </div>
@@ -138,7 +140,7 @@ export default async function EstruturaPage({ params }: PageProps<"/simulados/[i
                       <CamposBloco
                         opcoesPadrao={simulado.opcoes_padrao}
                         inicial={{
-                          quantidade: b.questoes.length || 1,
+                          numeros,
                           tipo: q0?.tipo ?? "multipla",
                           numOpcoes: q0?.num_opcoes || simulado.opcoes_padrao,
                           peso: Number(q0?.peso ?? 10),
@@ -150,9 +152,9 @@ export default async function EstruturaPage({ params }: PageProps<"/simulados/[i
 
                   {i === 0 && (
                     <p className="mt-3 text-xs text-sub">
-                      Ao reduzir a quantidade, as últimas questões do bloco são removidas. Só blocos
-                      de múltipla escolha entram no cartão-resposta e no percentual de acerto —
-                      discursiva e redação são lançadas por nota.
+                      Você pode colar uma lista vertical ou combinar números e intervalos. Um número
+                      só pode pertencer a uma matéria. Questões removidas da lista são excluídas do
+                      bloco.
                     </p>
                   )}
                 </li>

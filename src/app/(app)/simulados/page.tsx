@@ -38,7 +38,7 @@ export default async function SimuladosPage() {
       {simulados.length === 0 ? (
         <EmptyState
           titulo="Nenhum simulado criado"
-          descricao="Um simulado é formado por blocos de matérias, cada um com sua quantidade de questões."
+          descricao="Um simulado é formado por blocos de matérias, cada um com sua própria lista de questões."
           acao={
             <Link href="/simulados/novo" className="btn btn-primary btn-sm">
               Criar o primeiro

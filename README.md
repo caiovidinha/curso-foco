@@ -67,13 +67,16 @@ Acesse http://localhost:3000 e entre com a conta criada no passo 1.
 
    | Tipo | Configura | Como é corrigido |
    |---|---|---|
-   | Múltipla escolha | quantidade + nº de alternativas | cartão-resposta; entra no % de acerto |
-   | Discursiva | quantidade + nota máxima por questão | nota, na tela de correção |
-   | Redação | só a nota máxima (item único) | nota, na tela de correção |
+   | Múltipla escolha | números das questões + nº de alternativas | cartão-resposta; entra no % de acerto |
+   | Discursiva | números das questões + nota máxima por questão | nota, na tela de correção |
+   | Redação | número da questão + nota máxima (item único) | nota, na tela de correção |
 
    Não existe "discursiva com 5 alternativas": os campos somem conforme o tipo, e
-   o servidor normaliza de novo antes de gravar. A numeração global é recalculada
-   sozinha na ordem dos blocos. Vincule as turmas e clique em **Gerar provas**.
+   o servidor normaliza de novo antes de gravar. Os números podem ser informados
+   individualmente, colados em linhas ou abreviados por intervalos (`49, 61-63,
+   69`). Assim, matérias diferentes podem ocupar posições intercaladas na prova.
+   Um mesmo número não pode pertencer a dois blocos. Vincule as turmas e clique
+   em **Gerar provas**.
 4. **Simulado → Gabarito** — marque as respostas certas, ou cole a sequência
    inteira (`ABCDEEDCBA…`) no preenchimento rápido.
 

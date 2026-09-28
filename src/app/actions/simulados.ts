@@ -2,38 +2,10 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { analisarNumerosQuestoes, formatarNumerosQuestoes } from "@/lib/numeracao";
 import { createClient } from "@/lib/supabase/server";
 import { LETRAS, type Questao, type TipoQuestao } from "@/lib/types";
 import type { Resultado } from "./catalogo";
-
-type Supabase = Awaited<ReturnType<typeof createClient>>;
-
-/**
- * Renumera todas as questões do simulado de 1..N seguindo a ordem dos blocos.
- * Chamado sempre que a estrutura muda; os `id` não mudam, então as respostas já
- * gravadas continuam apontando para a questão certa.
- */
-async function renumerar(supabase: Supabase, simuladoId: string) {
-  const [{ data: blocos }, { data: questoes }] = await Promise.all([
-    supabase.from("simulado_materias").select("id, ordem").eq("simulado_id", simuladoId).order("ordem"),
-    supabase.from("questoes").select("*").eq("simulado_id", simuladoId).order("numero"),
-  ]);
-
-  if (!blocos || !questoes) return;
-
-  const ordemBloco = new Map(blocos.map((b, i) => [b.id as string, i]));
-  const ordenadas = [...(questoes as Questao[])].sort((a, b) => {
-    const d = (ordemBloco.get(a.simulado_materia_id) ?? 999) - (ordemBloco.get(b.simulado_materia_id) ?? 999);
-    return d !== 0 ? d : a.numero - b.numero;
-  });
-
-  const mudou = ordenadas.filter((q, i) => q.numero !== i + 1);
-  if (mudou.length === 0) return;
-
-  await supabase
-    .from("questoes")
-    .upsert(ordenadas.map((q, i) => ({ ...q, numero: i + 1 })), { onConflict: "id" });
-}
 
 // --- CRUD do simulado ------------------------------------------------------
 
@@ -193,10 +165,12 @@ function lerConfigBloco(formData: FormData) {
   const tipo: TipoQuestao =
     bruto === "discursiva" || bruto === "redacao" ? bruto : "multipla";
 
-  const quantidade =
-    tipo === "redacao"
-      ? 1
-      : Math.max(1, Math.min(300, Number(formData.get("quantidade") ?? 0)));
+  const numeracao = analisarNumerosQuestoes(String(formData.get("numeros_questoes") ?? ""));
+  if (!numeracao.ok) return numeracao;
+
+  if (tipo === "redacao" && numeracao.numeros.length !== 1) {
+    return { ok: false as const, erro: "A redação deve ter exatamente um número de questão." };
+  }
 
   const numOpcoes =
     tipo === "multipla" ? Math.max(2, Math.min(10, Number(formData.get("num_opcoes") ?? 5))) : 0;
@@ -211,23 +185,41 @@ function lerConfigBloco(formData: FormData) {
           ? 1000
           : 10;
 
-  return { tipo, quantidade, numOpcoes, peso };
+  return { ok: true as const, tipo, numeros: numeracao.numeros, numOpcoes, peso };
 }
 
 export async function adicionarBloco(formData: FormData): Promise<Resultado> {
   const simuladoId = String(formData.get("simulado_id") ?? "");
   const materiaId = String(formData.get("materia_id") ?? "");
-  const { tipo, quantidade, numOpcoes, peso } = lerConfigBloco(formData);
+  const config = lerConfigBloco(formData);
 
   if (!simuladoId || !materiaId) return { ok: false, erro: "Selecione a matéria." };
-  if (!quantidade) return { ok: false, erro: "Informe a quantidade de questões." };
+  if (!config.ok) return config;
+
+  const { tipo, numeros, numOpcoes, peso } = config;
 
   const supabase = await createClient();
 
-  const { data: existentes } = await supabase
-    .from("simulado_materias")
-    .select("ordem")
-    .eq("simulado_id", simuladoId);
+  const [{ data: existentes }, { data: ocupadas, error: erroOcupadas }] = await Promise.all([
+    supabase
+      .from("simulado_materias")
+      .select("ordem")
+      .eq("simulado_id", simuladoId),
+    supabase
+      .from("questoes")
+      .select("numero")
+      .eq("simulado_id", simuladoId)
+      .in("numero", numeros),
+  ]);
+
+  if (erroOcupadas) return { ok: false, erro: erroOcupadas.message };
+  if (ocupadas && ocupadas.length > 0) {
+    const repetidas = ocupadas.map((q) => q.numero as number).sort((a, b) => a - b);
+    return {
+      ok: false,
+      erro: `Já existem outras matérias nas questões: ${formatarNumerosQuestoes(repetidas)}.`,
+    };
+  }
 
   const ordem = Math.max(0, ...(existentes ?? []).map((b) => b.ordem as number)) + 1;
 
@@ -247,28 +239,29 @@ export async function adicionarBloco(formData: FormData): Promise<Resultado> {
     };
   }
 
-  const { data: ultimas } = await supabase
-    .from("questoes")
-    .select("numero")
-    .eq("simulado_id", simuladoId)
-    .order("numero", { ascending: false })
-    .limit(1);
-
-  const base = ultimas?.[0]?.numero ?? 0;
-
-  const novas = Array.from({ length: quantidade }, (_, i) => ({
+  const novas = numeros.map((numero) => ({
     simulado_id: simuladoId,
     simulado_materia_id: bloco.id,
-    numero: base + i + 1,
+    numero,
     tipo,
     num_opcoes: numOpcoes,
     peso,
   }));
 
   const { error } = await supabase.from("questoes").insert(novas);
-  if (error) return { ok: false, erro: error.message };
+  if (error) {
+    // Não deixa um bloco vazio para trás caso uma gravação concorrente ocupe
+    // um dos números depois da validação acima.
+    await supabase.from("simulado_materias").delete().eq("id", bloco.id);
+    return {
+      ok: false,
+      erro:
+        error.code === "23505"
+          ? "Uma ou mais questões já foram usadas por outra matéria. Atualize a página e tente novamente."
+          : error.message,
+    };
+  }
 
-  await renumerar(supabase, simuladoId);
   revalidatePath(`/simulados/${simuladoId}`);
   return { ok: true };
 }
@@ -276,27 +269,60 @@ export async function adicionarBloco(formData: FormData): Promise<Resultado> {
 export async function atualizarBloco(formData: FormData): Promise<Resultado> {
   const blocoId = String(formData.get("bloco_id") ?? "");
   const simuladoId = String(formData.get("simulado_id") ?? "");
-  const { tipo, quantidade, numOpcoes, peso } = lerConfigBloco(formData);
+  const config = lerConfigBloco(formData);
+
+  if (!blocoId || !simuladoId) return { ok: false, erro: "Bloco não encontrado." };
+  if (!config.ok) return config;
+
+  const { tipo, numeros, numOpcoes, peso } = config;
 
   const supabase = await createClient();
-  const { data: atuais, error: erroLer } = await supabase
-    .from("questoes")
-    .select("*")
-    .eq("simulado_materia_id", blocoId)
-    .order("numero");
+  const [{ data: atuais, error: erroLer }, { data: ocupadas, error: erroOcupadas }] =
+    await Promise.all([
+      supabase
+        .from("questoes")
+        .select("*")
+        .eq("simulado_materia_id", blocoId)
+        .order("numero"),
+      supabase
+        .from("questoes")
+        .select("numero")
+        .eq("simulado_id", simuladoId)
+        .neq("simulado_materia_id", blocoId)
+        .in("numero", numeros),
+    ]);
 
   if (erroLer) return { ok: false, erro: erroLer.message };
+  if (erroOcupadas) return { ok: false, erro: erroOcupadas.message };
+  if (ocupadas && ocupadas.length > 0) {
+    const repetidas = ocupadas.map((q) => q.numero as number).sort((a, b) => a - b);
+    return {
+      ok: false,
+      erro: `Estas questões já pertencem a outra matéria: ${formatarNumerosQuestoes(repetidas)}.`,
+    };
+  }
 
   const questoes = (atuais ?? []) as Questao[];
   const validas = LETRAS.slice(0, numOpcoes) as unknown as string[];
+  const desejados = new Set(numeros);
+  const porNumero = new Map(questoes.map((q) => [q.numero, q]));
+  const reutilizaveis = questoes.filter((q) => !desejados.has(q.numero));
+  const manter: Questao[] = [];
+  const novas: number[] = [];
 
-  if (quantidade < questoes.length) {
-    const remover = questoes.slice(quantidade).map((q) => q.id);
+  for (const numero of numeros) {
+    const questao = porNumero.get(numero) ?? reutilizaveis.shift();
+    if (questao) manter.push({ ...questao, numero });
+    else novas.push(numero);
+  }
+
+  const idsMantidos = new Set(manter.map((q) => q.id));
+  const remover = questoes.filter((q) => !idsMantidos.has(q.id)).map((q) => q.id);
+  if (remover.length > 0) {
     const { error } = await supabase.from("questoes").delete().in("id", remover);
     if (error) return { ok: false, erro: error.message };
   }
 
-  const manter = questoes.slice(0, quantidade);
   if (manter.length > 0) {
     const { error } = await supabase.from("questoes").upsert(
       manter.map((q) => ({
@@ -304,7 +330,7 @@ export async function atualizarBloco(formData: FormData): Promise<Resultado> {
         tipo,
         num_opcoes: numOpcoes,
         peso,
-        // gabarito fora do novo intervalo de alternativas deixa de valer
+        // Gabarito fora do novo intervalo de alternativas deixa de valer.
         gabarito: tipo === "multipla" && q.gabarito && validas.includes(q.gabarito) ? q.gabarito : null,
       })),
       { onConflict: "id" },
@@ -312,21 +338,27 @@ export async function atualizarBloco(formData: FormData): Promise<Resultado> {
     if (error) return { ok: false, erro: error.message };
   }
 
-  if (quantidade > questoes.length) {
-    const base = Math.max(0, ...questoes.map((q) => q.numero));
-    const novas = Array.from({ length: quantidade - questoes.length }, (_, i) => ({
+  if (novas.length > 0) {
+    const linhas = novas.map((numero) => ({
       simulado_id: simuladoId,
       simulado_materia_id: blocoId,
-      numero: base + i + 1 + 10_000, // fora de faixa; `renumerar` corrige em seguida
+      numero,
       tipo,
       num_opcoes: numOpcoes,
       peso,
     }));
-    const { error } = await supabase.from("questoes").insert(novas);
-    if (error) return { ok: false, erro: error.message };
+    const { error } = await supabase.from("questoes").insert(linhas);
+    if (error) {
+      return {
+        ok: false,
+        erro:
+          error.code === "23505"
+            ? "Uma ou mais questões já foram usadas por outra matéria. Atualize a página e tente novamente."
+            : error.message,
+      };
+    }
   }
 
-  await renumerar(supabase, simuladoId);
   revalidatePath(`/simulados/${simuladoId}`);
   return { ok: true };
 }
@@ -339,7 +371,6 @@ export async function removerBloco(formData: FormData): Promise<Resultado> {
   const { error } = await supabase.from("simulado_materias").delete().eq("id", blocoId);
   if (error) return { ok: false, erro: error.message };
 
-  await renumerar(supabase, simuladoId);
   revalidatePath(`/simulados/${simuladoId}`);
   return { ok: true };
 }
@@ -369,7 +400,6 @@ export async function moverBloco(formData: FormData): Promise<Resultado> {
     lista.map((b, idx) => supabase.from("simulado_materias").update({ ordem: idx + 1 }).eq("id", b.id)),
   );
 
-  await renumerar(supabase, simuladoId);
   revalidatePath(`/simulados/${simuladoId}`);
   return { ok: true };
 }

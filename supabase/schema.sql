@@ -101,9 +101,8 @@ create table if not exists questoes (
   created_at           timestamptz not null default now()
 );
 
--- A numeração é recalculada em bloco quando a estrutura do simulado muda, o que
--- passa por estados intermediários duplicados. A restrição precisa ser adiada
--- para o fim da transação.
+-- Cada número identifica sua posição na prova e só pode pertencer a uma matéria.
+-- A restrição adiada também permite atualizar vários números na mesma operação.
 do $$
 begin
   if not exists (

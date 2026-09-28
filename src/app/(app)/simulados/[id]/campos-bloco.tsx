@@ -2,21 +2,22 @@
 
 import { useState } from "react";
 import { Field } from "@/components/ui";
+import { formatarNumerosQuestoes } from "@/lib/numeracao";
 import type { TipoQuestao } from "@/lib/types";
 
 /**
  * Campos de configuração de um bloco. O conjunto muda conforme o tipo:
  *
- *   múltipla escolha → quantidade + nº de alternativas
- *   discursiva       → quantidade + nota máxima por questão (sem alternativas)
- *   redação          → item único, só nota máxima (sem quantidade nem alternativas)
+ *   múltipla escolha → números das questões + nº de alternativas
+ *   discursiva       → números das questões + nota máxima por questão
+ *   redação          → número da questão + nota máxima
  */
 export function CamposBloco({
   opcoesPadrao,
   inicial,
 }: {
   opcoesPadrao: number;
-  inicial?: { quantidade: number; tipo: TipoQuestao; numOpcoes: number; peso: number };
+  inicial?: { numeros: number[]; tipo: TipoQuestao; numOpcoes: number; peso: number };
 }) {
   const [tipo, setTipo] = useState<TipoQuestao>(inicial?.tipo ?? "multipla");
 
@@ -42,24 +43,21 @@ export function CamposBloco({
         </Field>
       </div>
 
-      {ehRedacao ? (
-        // a redação é sempre um item só — a quantidade não é escolha do usuário
-        <input type="hidden" name="quantidade" value="1" />
-      ) : (
-        <div className="w-full min-w-24 flex-1 sm:w-auto">
-          <Field label="Questões">
-            <input
-              className="input tabular"
-              name="quantidade"
-              type="number"
-              min={1}
-              max={300}
-              defaultValue={inicial?.quantidade || 10}
-              required
-            />
-          </Field>
-        </div>
-      )}
+      <div className="w-full min-w-64 flex-[2] sm:w-auto">
+        <Field
+          label={ehRedacao ? "Número da questão" : "Números das questões"}
+          hint={ehRedacao ? undefined : "Separe por vírgulas ou use intervalos, como 49, 61–63, 69."}
+        >
+          <textarea
+            className="textarea tabular min-h-11 resize-y"
+            name="numeros_questoes"
+            rows={2}
+            defaultValue={inicial ? formatarNumerosQuestoes(inicial.numeros) : ""}
+            placeholder={ehRedacao ? "Ex.: 91" : "Ex.: 49, 61–63, 69, 71"}
+            required
+          />
+        </Field>
+      </div>
 
       {ehMultipla ? (
         <div className="w-full min-w-32 flex-1 sm:w-auto">

@@ -10,7 +10,7 @@ export default function NovoSimuladoPage() {
       <PageHeader
         titulo="Novo simulado"
         voltar="/simulados"
-        subtitulo="Depois de criar, você monta os blocos de matérias e a quantidade de questões."
+        subtitulo="Depois de criar, você distribui os números das questões entre as matérias, inclusive de forma não sequencial."
       />
 
       <form action={criarSimulado} className="card max-w-2xl space-y-4 p-5">

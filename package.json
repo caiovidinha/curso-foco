@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "verificar": "npm run verificar:sequencia && npm run verificar:omr",
+    "verificar": "npm run verificar:numeracao && npm run verificar:sequencia && npm run verificar:omr",
+    "verificar:numeracao": "node --import ./scripts/alias.mjs scripts/verificar-numeracao.ts",
     "verificar:omr": "node --import ./scripts/alias.mjs scripts/verificar-omr.ts",
     "verificar:sequencia": "node --import ./scripts/alias.mjs scripts/verificar-sequencia.ts"
   },
